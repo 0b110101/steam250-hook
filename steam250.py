@@ -1,6 +1,5 @@
 import json
 import os
-import re
 from pathlib import Path
 
 import requests
@@ -22,8 +21,12 @@ HEADERS = {
 
 
 # ============================================================
-# 基础
+# 基础工具
 # ============================================================
+
+def clean_text(text):
+    return " ".join(text.split()).strip()
+
 
 def fetch_page():
     response = requests.get(
@@ -37,24 +40,29 @@ def fetch_page():
     return response.text
 
 
-def clean_text(text):
-    return " ".join(text.split()).strip()
-
-
 # ============================================================
-# 找到主榜单
+# 找主榜单
 # ============================================================
 
-def find_main_ranking_table(soup):
+def find_main_ranking(soup):
     """
-    只定位：
+    Steam250 /7day 的主榜单结构：
 
+    <section class="applist compact no-wl anim8">
+        <header>...</header>
+
+        <div id="1">...</div>
+        <div id="2">...</div>
+        ...
+
+    页面左侧还有一个独立的 New entries 区域。
+
+    这里严格只寻找：
         Week Top 50 Games Ranking
 
-    标题下面的主榜单 table。
+    标题之后对应的主榜单 section。
 
-    不扫描整个页面，因此左侧的
-    New entries 区域不会被抓取。
+    不读取左侧 New entries。
     """
 
     heading = soup.find(
@@ -66,118 +74,122 @@ def find_main_ranking_table(soup):
 
     if heading is None:
         raise RuntimeError(
-            "找不到 'Week Top 50 Games Ranking'，"
-            "Steam250 页面结构可能发生变化。"
+            "找不到 'Week Top 50 Games Ranking'。"
         )
 
-    # 主榜单应该位于这个标题之后的第一个 table。
-    table = heading.find_next("table")
+    # 标题之后寻找 class 包含 applist 的 section
+    ranking = heading.find_next(
+        "section",
+        class_=lambda classes: (
+            classes
+            and "applist" in classes
+        ),
+    )
 
-    if table is None:
+    if ranking is None:
         raise RuntimeError(
-            "找到 Top 50 标题，但找不到对应的主榜单 table。"
+            "找到 Top 50 标题，但找不到对应的 "
+            "applist 主榜单。"
         )
 
-    return table
+    return ranking
 
 
 # ============================================================
 # 解析主榜单
 # ============================================================
 
-def parse_main_ranking(table):
+def parse_main_ranking(ranking):
     """
-    只解析主 Top 50 table。
+    只解析主榜单 section。
 
-    每个游戏对应一个 <tr>。
+    New 的判断方式：
 
-    只保留主榜单中明确带 New 的游戏。
+        <div class="rank">
+            <span title="New entry">New</span>
+            3
+        </div>
+
+    所以严格判断：
+        span[title="New entry"]
+
+    不搜索整个页面的 New。
     """
 
     games = []
 
-    rows = table.find_all("tr")
+    # 主榜单的每个游戏都是直接位于 section 下的 div
+    rows = ranking.find_all(
+        "div",
+        recursive=False,
+    )
 
     for row in rows:
-        row_text = clean_text(
-            row.get_text(" ", strip=True)
+
+        # ----------------------------------------------------
+        # 必须是游戏行
+        # ----------------------------------------------------
+
+        rank_div = row.find(
+            "div",
+            class_="rank",
+            recursive=False,
         )
 
-        if not row_text:
+        if rank_div is None:
             continue
 
         # ----------------------------------------------------
-        # 只处理带 New 的行
+        # 判断 New
         # ----------------------------------------------------
 
-        if not re.search(
-            r"\bNew\b",
-            row_text,
-            re.IGNORECASE,
-        ):
+        new_marker = rank_div.find(
+            "span",
+            attrs={
+                "title": "New entry"
+            },
+        )
+
+        if new_marker is None:
             continue
 
         # ----------------------------------------------------
-        # 找单元格
-        # ----------------------------------------------------
-
-        cells = row.find_all(["td", "th"])
-
-        if not cells:
-            continue
-
-        cell_texts = [
-            clean_text(cell.get_text(" ", strip=True))
-            for cell in cells
-        ]
-
-        # ----------------------------------------------------
-        # 找排名
+        # Rank
         # ----------------------------------------------------
 
         rank = None
 
-        for cell_text in cell_texts:
-            match = re.fullmatch(
-                r"\d{1,2}",
-                cell_text,
-            )
+        rank_text = clean_text(
+            rank_div.get_text(" ", strip=True)
+        )
 
-            if match:
-                rank = int(match.group())
+        # 例如：
+        # "New 3"
+        # "3"
+        parts = rank_text.split()
+
+        for part in reversed(parts):
+            if part.isdigit():
+                rank = int(part)
                 break
 
         # ----------------------------------------------------
-        # 找游戏链接
+        # Game title
         # ----------------------------------------------------
 
-        game_link = None
+        title_div = row.find(
+            "div",
+            class_="title",
+            recursive=False,
+        )
 
-        for a in row.find_all("a", href=True):
-            name = clean_text(
-                a.get_text(" ", strip=True)
-            )
+        if title_div is None:
+            continue
 
-            href = a["href"].strip()
-
-            if not name:
-                continue
-
-            # Steam250 游戏链接一般是 club.steam250.com
-            # 这里排除明显的标签/日期/排名链接。
-            if (
-                "steam250.com" in href
-                and name not in {
-                    "New",
-                    "Demo",
-                    "Free",
-                    "EA",
-                }
-            ):
-                # 游戏名称通常是较长的链接文本，
-                # 标签则通常位于游戏链接之后。
-                game_link = a
-                break
+        game_link = title_div.find(
+            "a",
+            href=True,
+        )
 
         if game_link is None:
             continue
@@ -186,7 +198,14 @@ def parse_main_ranking(table):
             game_link.get_text(" ", strip=True)
         )
 
+        if not game_name:
+            continue
+
         game_url = game_link["href"].strip()
+
+        # ----------------------------------------------------
+        # Steam250 Game URL
+        # ----------------------------------------------------
 
         if game_url.startswith("/"):
             game_url = (
@@ -198,110 +217,118 @@ def parse_main_ranking(table):
         # Score
         # ----------------------------------------------------
 
+        score_div = row.find(
+            "div",
+            class_="score",
+            recursive=False,
+        )
+
         score = None
 
-        for cell_text in cell_texts:
-            if re.fullmatch(
-                r"\d+\.\d{1,2}",
-                cell_text,
-            ):
-                value = float(cell_text)
+        if score_div:
+            score_span = score_div.find("span")
 
-                # Steam250 Score 正常应该在这个范围
-                if 0 <= value <= 10:
-                    score = cell_text
-                    break
+            if score_span:
+                score = clean_text(
+                    score_span.get_text(
+                        " ",
+                        strip=True,
+                    )
+                )
 
         # ----------------------------------------------------
         # Reviews
         # ----------------------------------------------------
 
+        reviews_div = row.find(
+            "div",
+            class_="reviews",
+            recursive=False,
+        )
+
         reviews = None
 
-        for cell_text in cell_texts:
-            if re.fullmatch(
-                r"[\d,]+",
-                cell_text,
-            ):
-                value = int(
-                    cell_text.replace(",", "")
+        if reviews_div:
+
+            votes = reviews_div.find(
+                "span",
+                class_="votes",
+            )
+
+            if votes:
+                reviews = clean_text(
+                    votes.get_text(
+                        " ",
+                        strip=True,
+                    )
                 )
 
-                # 避免把排名误认为 Reviews
-                if value > 50:
-                    reviews = cell_text
-                    break
+        # ----------------------------------------------------
+        # Price
+        # ----------------------------------------------------
+
+        price_div = row.find(
+            "div",
+            class_="price",
+            recursive=False,
+        )
+
+        price_text = ""
+
+        if price_div:
+            price_text = clean_text(
+                price_div.get_text(
+                    " ",
+                    strip=True,
+                )
+            )
 
         # ----------------------------------------------------
-        # 标签
+        # Tags
         # ----------------------------------------------------
 
         tags = []
 
-        for a in row.find_all("a", href=True):
-            tag_text = clean_text(
-                a.get_text(" ", strip=True)
+        for tag in title_div.select(
+            "div a.tag"
+        ):
+            tag_name = clean_text(
+                tag.get_text(
+                    " ",
+                    strip=True,
+                )
             )
 
-            if not tag_text:
-                continue
+            if tag_name:
+                tags.append(tag_name)
 
-            if tag_text == game_name:
-                continue
-
-            if tag_text in {
-                "New",
-                "Demo",
-                "Free",
-                "EA",
-            }:
-                continue
-
-            # 排除日期、排名等非标签链接
-            if re.fullmatch(
-                r"\d+\s*(days?|day|yesterday)",
-                tag_text,
-                re.IGNORECASE,
-            ):
-                continue
-
-            if len(tag_text) <= 80:
-                tags.append(tag_text)
-
-        # 去重，同时保持顺序
-        tags = list(dict.fromkeys(tags))
-
-        # ----------------------------------------------------
-        # Price free
-        # ----------------------------------------------------
-
-        is_free = bool(
-            re.search(
-                r"Price\s+free",
-                row_text,
-                re.IGNORECASE,
-            )
+        # 去重
+        tags = list(
+            dict.fromkeys(tags)
         )
 
-        # Steam250 当前页面可能直接显示 Free
-        # 也兼容 Price free 的情况。
-        if re.search(
-            r"\bFree\b",
-            row_text,
-            re.IGNORECASE,
-        ):
+        # ----------------------------------------------------
+        # Free
+        # ----------------------------------------------------
+
+        is_free = False
+
+        if "free" in price_text.lower():
             is_free = True
 
         # ----------------------------------------------------
         # Adult only
         # ----------------------------------------------------
 
-        is_adult_only = bool(
-            re.search(
-                r"\bAdult\s+only\b",
-                row_text,
-                re.IGNORECASE,
+        row_text = clean_text(
+            row.get_text(
+                " ",
+                strip=True,
             )
+        )
+
+        is_adult_only = (
+            "adult only" in row_text.lower()
         )
 
         # ----------------------------------------------------
@@ -313,19 +340,20 @@ def parse_main_ranking(table):
             for tag in tags
         )
 
-        games.append(
-            {
-                "rank": rank,
-                "name": game_name,
-                "score": score,
-                "reviews": reviews,
-                "tags": tags,
-                "url": game_url,
-                "is_free": is_free,
-                "is_adult_only": is_adult_only,
-                "has_horror": has_horror,
-            }
-        )
+        game = {
+            "rank": rank,
+            "name": game_name,
+            "score": score,
+            "reviews": reviews,
+            "price": price_text,
+            "tags": tags,
+            "url": game_url,
+            "is_free": is_free,
+            "is_adult_only": is_adult_only,
+            "has_horror": has_horror,
+        }
+
+        games.append(game)
 
     return games
 
@@ -335,6 +363,7 @@ def parse_main_ranking(table):
 # ============================================================
 
 def filter_games(games):
+
     result = []
 
     for game in games:
@@ -371,12 +400,14 @@ def filter_games(games):
 # ============================================================
 
 def load_state():
+
     if not STATE_FILE.exists():
         return {
             "pushed_games": []
         }
 
     try:
+
         with STATE_FILE.open(
             "r",
             encoding="utf-8",
@@ -394,6 +425,7 @@ def load_state():
         return data
 
     except Exception as e:
+
         print(
             f"[WARNING] Failed to load state: {e}"
         )
@@ -404,6 +436,7 @@ def load_state():
 
 
 def save_state(state):
+
     STATE_FILE.parent.mkdir(
         parents=True,
         exist_ok=True,
@@ -422,9 +455,6 @@ def save_state(state):
 
 
 def get_game_id(game):
-    """
-    使用 Steam250 游戏 URL 作为唯一 ID。
-    """
 
     if game["url"]:
         return game["url"]
@@ -437,14 +467,9 @@ def get_game_id(game):
 # ============================================================
 
 def build_discord_embeds(games):
-    """
-    Discord Embed description 上限为 4096 字符。
-
-    因此根据长度自动拆分成多个 Embed，
-    但仍然只发送一次 webhook。
-    """
 
     chunks = []
+
     current_lines = []
     current_length = 0
 
@@ -458,19 +483,22 @@ def build_discord_embeds(games):
 
         score = (
             game["score"]
-            if game["score"] is not None
+            if game["score"]
             else "N/A"
         )
 
         name = game["name"]
 
         if game["url"]:
+
             line = (
                 f"🆕 **#{rank}** "
                 f"[{name}]({game['url']}) "
                 f"— **{score}**"
             )
+
         else:
+
             line = (
                 f"🆕 **#{rank}** "
                 f"**{name}** "
@@ -487,6 +515,7 @@ def build_discord_embeds(games):
             current_lines
             and new_length > 3800
         ):
+
             chunks.append(
                 "\n".join(current_lines)
             )
@@ -495,22 +524,31 @@ def build_discord_embeds(games):
             current_length = 0
 
         current_lines.append(line)
-        current_length += len(line) + 1
+
+        current_length += (
+            len(line) + 1
+        )
 
     if current_lines:
+
         chunks.append(
             "\n".join(current_lines)
         )
 
     embeds = []
 
-    for index, description in enumerate(chunks):
+    for index, description in enumerate(
+        chunks
+    ):
 
         if index == 0:
+
             title = (
                 "🎮 Steam250 — New Entries"
             )
+
         else:
+
             title = (
                 "🎮 Steam250 — New Entries "
                 f"({index + 1}/{len(chunks)})"
@@ -534,6 +572,7 @@ def build_discord_embeds(games):
 
 
 def send_discord(games):
+
     if not DISCORD_WEBHOOK:
         raise RuntimeError(
             "没有设置 "
@@ -544,11 +583,10 @@ def send_discord(games):
         games
     )
 
-    # Discord 一次 webhook 最多 10 个 embeds
     if len(embeds) > 10:
         raise RuntimeError(
-            "New 游戏过多，Discord Embed "
-            "数量超过 10 个。"
+            "New 游戏数量过多，"
+            "Discord Embed 超过 10 个。"
         )
 
     payload = {
@@ -586,7 +624,7 @@ def main():
     )
 
     # --------------------------------------------------------
-    # 抓取页面
+    # 1. Fetch
     # --------------------------------------------------------
 
     print(
@@ -601,19 +639,19 @@ def main():
     )
 
     # --------------------------------------------------------
-    # 定位主榜单
+    # 2. Main ranking
     # --------------------------------------------------------
 
     print(
         "[2/5] Locating main Top 50 ranking..."
     )
 
-    main_table = find_main_ranking_table(
+    ranking = find_main_ranking(
         soup
     )
 
     # --------------------------------------------------------
-    # 解析 New
+    # 3. New
     # --------------------------------------------------------
 
     print(
@@ -621,7 +659,7 @@ def main():
     )
 
     new_games = parse_main_ranking(
-        main_table
+        ranking
     )
 
     print(
@@ -630,21 +668,27 @@ def main():
     )
 
     if not new_games:
+
         print(
-            "[INFO] No New games in main ranking."
+            "[INFO] No New entries."
         )
+
         return
 
     for game in new_games:
+
         print(
-            f"[NEW] #{game['rank']} "
+            f"[NEW] "
+            f"#{game['rank']} "
             f"{game['name']} "
             f"| score={game['score']} "
+            f"| reviews={game['reviews']} "
+            f"| price={game['price']} "
             f"| tags={game['tags']}"
         )
 
     # --------------------------------------------------------
-    # 过滤
+    # 4. Filters
     # --------------------------------------------------------
 
     print(
@@ -661,14 +705,16 @@ def main():
     )
 
     if not filtered_games:
+
         print(
             "[INFO] No games remain "
             "after filtering."
         )
+
         return
 
     # --------------------------------------------------------
-    # 防重复
+    # 5. Duplicate protection
     # --------------------------------------------------------
 
     state = load_state()
@@ -676,7 +722,7 @@ def main():
     pushed_games = set(
         state.get(
             "pushed_games",
-            []
+            [],
         )
     )
 
@@ -687,19 +733,23 @@ def main():
         game_id = get_game_id(game)
 
         if game_id in pushed_games:
+
             print(
                 f"[SKIP] Already pushed: "
                 f"{game['name']}"
             )
+
             continue
 
         games_to_send.append(game)
 
     if not games_to_send:
+
         print(
             "[INFO] All matching New games "
             "have already been pushed."
         )
+
         return
 
     # --------------------------------------------------------
@@ -715,15 +765,16 @@ def main():
     )
 
     # --------------------------------------------------------
-    # 保存 State
+    # Save state
     # --------------------------------------------------------
 
     for game in games_to_send:
+
         pushed_games.add(
             get_game_id(game)
         )
 
-    # 最多保存 500 个
+    # 最多保存最近 500 个
     state["pushed_games"] = list(
         pushed_games
     )[-500:]
