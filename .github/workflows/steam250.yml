@@ -2,8 +2,8 @@ name: Steam250 New Games
 
 on:
   schedule:
-    # 02:05 北京时间
-    # = 18:05 UTC（前一天）
+    # 北京时间每天 02:05
+    # = UTC 前一天 18:05
     - cron: "5 18 * * *"
 
   workflow_dispatch:
