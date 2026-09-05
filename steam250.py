@@ -46,30 +46,31 @@ def fetch_page():
 
 def find_main_ranking(soup):
     """
-    Steam250 /7day 的主榜单结构：
+    只定位 Steam250 的主 Top 50 榜单。
+
+    页面结构：
 
     <section class="applist compact no-wl anim8">
         <header>...</header>
-
         <div id="1">...</div>
         <div id="2">...</div>
         ...
+    </section>
 
-    页面左侧还有一个独立的 New entries 区域。
-
-    这里严格只寻找：
-        Week Top 50 Games Ranking
-
-    标题之后对应的主榜单 section。
-
-    不读取左侧 New entries。
+    左侧 New entries 是其他区域，
+    不参与抓取。
     """
 
     heading = soup.find(
         lambda tag:
         tag.name in {"h1", "h2", "h3"}
         and "Week Top 50 Games Ranking"
-        in clean_text(tag.get_text(" ", strip=True))
+        in clean_text(
+            tag.get_text(
+                " ",
+                strip=True,
+            )
+        )
     )
 
     if heading is None:
@@ -77,7 +78,6 @@ def find_main_ranking(soup):
             "找不到 'Week Top 50 Games Ranking'。"
         )
 
-    # 标题之后寻找 class 包含 applist 的 section
     ranking = heading.find_next(
         "section",
         class_=lambda classes: (
@@ -88,8 +88,8 @@ def find_main_ranking(soup):
 
     if ranking is None:
         raise RuntimeError(
-            "找到 Top 50 标题，但找不到对应的 "
-            "applist 主榜单。"
+            "找到 Top 50 标题，"
+            "但找不到对应的 applist 主榜单。"
         )
 
     return ranking
@@ -101,24 +101,25 @@ def find_main_ranking(soup):
 
 def parse_main_ranking(ranking):
     """
-    只解析主榜单 section。
+    只解析主榜单中的游戏。
 
-    New 的判断方式：
+    New 判断：
 
         <div class="rank">
-            <span title="New entry">New</span>
-            3
+            <span title="New entry">New</span> 3
         </div>
 
-    所以严格判断：
-        span[title="New entry"]
+    Adult only 判断：
 
-    不搜索整个页面的 New。
+        <a class="18"
+           href="/adult"
+           title="Adult only">
+            18
+        </a>
     """
 
     games = []
 
-    # 主榜单的每个游戏都是直接位于 section 下的 div
     rows = ranking.find_all(
         "div",
         recursive=False,
@@ -127,7 +128,7 @@ def parse_main_ranking(ranking):
     for row in rows:
 
         # ----------------------------------------------------
-        # 必须是游戏行
+        # Rank
         # ----------------------------------------------------
 
         rank_div = row.find(
@@ -140,7 +141,7 @@ def parse_main_ranking(ranking):
             continue
 
         # ----------------------------------------------------
-        # 判断 New
+        # New
         # ----------------------------------------------------
 
         new_marker = rank_div.find(
@@ -154,21 +155,21 @@ def parse_main_ranking(ranking):
             continue
 
         # ----------------------------------------------------
-        # Rank
+        # Rank number
         # ----------------------------------------------------
 
         rank = None
 
         rank_text = clean_text(
-            rank_div.get_text(" ", strip=True)
+            rank_div.get_text(
+                " ",
+                strip=True,
+            )
         )
 
-        # 例如：
-        # "New 3"
-        # "3"
-        parts = rank_text.split()
-
-        for part in reversed(parts):
+        for part in reversed(
+            rank_text.split()
+        ):
             if part.isdigit():
                 rank = int(part)
                 break
@@ -195,17 +196,16 @@ def parse_main_ranking(ranking):
             continue
 
         game_name = clean_text(
-            game_link.get_text(" ", strip=True)
+            game_link.get_text(
+                " ",
+                strip=True,
+            )
         )
 
         if not game_name:
             continue
 
         game_url = game_link["href"].strip()
-
-        # ----------------------------------------------------
-        # Steam250 Game URL
-        # ----------------------------------------------------
 
         if game_url.startswith("/"):
             game_url = (
@@ -214,30 +214,15 @@ def parse_main_ranking(ranking):
             )
 
         # ----------------------------------------------------
-        # Score
-        # ----------------------------------------------------
-
-        score_div = row.find(
-            "div",
-            class_="score",
-            recursive=False,
-        )
-
-        score = None
-
-        if score_div:
-            score_span = score_div.find("span")
-
-            if score_span:
-                score = clean_text(
-                    score_span.get_text(
-                        " ",
-                        strip=True,
-                    )
-                )
-
-        # ----------------------------------------------------
         # Reviews
+        #
+        # <div class="reviews stat">
+        #     <span class="votes">21</span>
+        #     <div class="meter rating">
+        #         <span style="width: 100%"></span>
+        #         100%
+        #     </div>
+        # </div>
         # ----------------------------------------------------
 
         reviews_div = row.find(
@@ -246,25 +231,65 @@ def parse_main_ranking(ranking):
             recursive=False,
         )
 
-        reviews = None
+        votes = None
+        rating_percent = None
 
         if reviews_div:
 
-            votes = reviews_div.find(
+            votes_span = reviews_div.find(
                 "span",
                 class_="votes",
             )
 
-            if votes:
-                reviews = clean_text(
-                    votes.get_text(
+            if votes_span:
+                votes = clean_text(
+                    votes_span.get_text(
                         " ",
                         strip=True,
                     )
                 )
 
+            meter = reviews_div.find(
+                "div",
+                class_="meter",
+            )
+
+            if meter:
+
+                rating_span = meter.find(
+                    "span"
+                )
+
+                if rating_span:
+
+                    style = rating_span.get(
+                        "style",
+                        "",
+                    )
+
+                    # width: 100%
+                    import re
+
+                    match = re.search(
+                        r"width\s*:\s*([\d.]+%)",
+                        style,
+                        re.IGNORECASE,
+                    )
+
+                    if match:
+                        rating_percent = (
+                            match.group(1)
+                        )
+
         # ----------------------------------------------------
         # Price
+        #
+        # <div class="price stat">
+        #     <span> $4.79 </span>
+        #     <span>$5.99</span>
+        # </div>
+        #
+        # 只取第一个 span
         # ----------------------------------------------------
 
         price_div = row.find(
@@ -273,25 +298,64 @@ def parse_main_ranking(ranking):
             recursive=False,
         )
 
-        price_text = ""
+        price = None
+        is_free = False
 
         if price_div:
-            price_text = clean_text(
-                price_div.get_text(
-                    " ",
-                    strip=True,
-                )
+
+            price_spans = price_div.find_all(
+                "span",
+                recursive=False,
             )
+
+            if price_spans:
+
+                price = clean_text(
+                    price_spans[0].get_text(
+                        " ",
+                        strip=True,
+                    )
+                )
+
+                if price.lower() == "free":
+                    is_free = True
+
+        # ----------------------------------------------------
+        # Adult only
+        #
+        # <a class="18"
+        #    href="/adult"
+        #    title="Adult only">
+        #    18
+        # </a>
+        # ----------------------------------------------------
+
+        adult_marker = row.find(
+            "a",
+            href="/adult",
+            title="Adult only",
+        )
+
+        is_adult_only = (
+            adult_marker is not None
+        )
 
         # ----------------------------------------------------
         # Tags
+        #
+        # 只读取这个游戏自己的 title 区域
+        #
+        # <a class="g3 tag">
+        #     Souls-like
+        # </a>
         # ----------------------------------------------------
 
         tags = []
 
         for tag in title_div.select(
-            "div a.tag"
+            "a.tag"
         ):
+
             tag_name = clean_text(
                 tag.get_text(
                     " ",
@@ -302,33 +366,8 @@ def parse_main_ranking(ranking):
             if tag_name:
                 tags.append(tag_name)
 
-        # 去重
         tags = list(
             dict.fromkeys(tags)
-        )
-
-        # ----------------------------------------------------
-        # Free
-        # ----------------------------------------------------
-
-        is_free = False
-
-        if "free" in price_text.lower():
-            is_free = True
-
-        # ----------------------------------------------------
-        # Adult only
-        # ----------------------------------------------------
-
-        row_text = clean_text(
-            row.get_text(
-                " ",
-                strip=True,
-            )
-        )
-
-        is_adult_only = (
-            "adult only" in row_text.lower()
         )
 
         # ----------------------------------------------------
@@ -340,12 +379,16 @@ def parse_main_ranking(ranking):
             for tag in tags
         )
 
+        # ----------------------------------------------------
+        # 保存
+        # ----------------------------------------------------
+
         game = {
             "rank": rank,
             "name": game_name,
-            "score": score,
-            "reviews": reviews,
-            "price": price_text,
+            "votes": votes,
+            "rating_percent": rating_percent,
+            "price": price,
             "tags": tags,
             "url": game_url,
             "is_free": is_free,
@@ -475,34 +518,56 @@ def build_discord_embeds(games):
 
     for game in games:
 
-        rank = (
-            str(game["rank"])
-            if game["rank"] is not None
+        name = game["name"]
+
+        # ----------------------------------------------------
+        # 21/100%
+        # ----------------------------------------------------
+
+        votes = (
+            game["votes"]
+            if game["votes"]
             else "?"
         )
 
-        score = (
-            game["score"]
-            if game["score"]
+        rating = (
+            game["rating_percent"]
+            if game["rating_percent"]
+            else "?"
+        )
+
+        # ----------------------------------------------------
+        # Price
+        # ----------------------------------------------------
+
+        price = (
+            game["price"]
+            if game["price"]
             else "N/A"
         )
 
-        name = game["name"]
+        # ----------------------------------------------------
+        # 最终格式：
+        #
+        # 🆕 Order Automatica — 21/100% -$4.79
+        # ----------------------------------------------------
 
         if game["url"]:
 
             line = (
-                f"🆕 **#{rank}** "
+                f"🆕 "
                 f"[{name}]({game['url']}) "
-                f"— **{score}**"
+                f"— {votes}/{rating} "
+                f"-{price}"
             )
 
         else:
 
             line = (
-                f"🆕 **#{rank}** "
-                f"**{name}** "
-                f"— **{score}**"
+                f"🆕 "
+                f"{name} "
+                f"— {votes}/{rating} "
+                f"-{price}"
             )
 
         new_length = (
@@ -517,7 +582,9 @@ def build_discord_embeds(games):
         ):
 
             chunks.append(
-                "\n".join(current_lines)
+                "\n".join(
+                    current_lines
+                )
             )
 
             current_lines = []
@@ -532,7 +599,9 @@ def build_discord_embeds(games):
     if current_lines:
 
         chunks.append(
-            "\n".join(current_lines)
+            "\n".join(
+                current_lines
+            )
         )
 
     embeds = []
@@ -651,7 +720,7 @@ def main():
     )
 
     # --------------------------------------------------------
-    # 3. New
+    # 3. Parse New
     # --------------------------------------------------------
 
     print(
@@ -681,9 +750,11 @@ def main():
             f"[NEW] "
             f"#{game['rank']} "
             f"{game['name']} "
-            f"| score={game['score']} "
-            f"| reviews={game['reviews']} "
+            f"| votes={game['votes']} "
+            f"| rating={game['rating_percent']} "
             f"| price={game['price']} "
+            f"| adult={game['is_adult_only']} "
+            f"| horror={game['has_horror']} "
             f"| tags={game['tags']}"
         )
 
@@ -774,7 +845,6 @@ def main():
             get_game_id(game)
         )
 
-    # 最多保存最近 500 个
     state["pushed_games"] = list(
         pushed_games
     )[-500:]
@@ -788,9 +858,11 @@ def main():
     print(
         "========================================"
     )
+
     print(
         "Done."
     )
+
     print(
         "========================================"
     )
