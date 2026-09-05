@@ -7,7 +7,12 @@ import requests
 from bs4 import BeautifulSoup
 
 
+# ============================================================
+# Configuration
+# ============================================================
+
 STEAM250_URL = "https://steam250.com/7day"
+
 STATE_FILE = Path("data/steam250_state.json")
 
 WEBHOOK_URL = os.environ.get("STEAM250_DISCORD_WEBHOOK")
@@ -22,93 +27,236 @@ HEADERS = {
 
 
 # ============================================================
-# Steam250 标签中文翻译
+# Steam250 → 简体中文标签
 # ============================================================
 
 TAG_TRANSLATIONS = {
-    "Roguelike Deckbuilder": "Roguelike 卡牌构筑",
-    "Souls-like": "类魂",
+
+    # --------------------------------------------------------
+    # 基础类型
+    # --------------------------------------------------------
+
     "Action": "动作",
-    "RPG": "RPG",
-    "Strategy": "策略",
     "Adventure": "冒险",
-    "Indie": "独立",
-    "Simulation": "模拟",
     "Casual": "休闲",
     "Puzzle": "解谜",
-    "Platformer": "平台",
-    "Early Access": "抢先体验",
-    "Turn-Based": "回合制",
-    "Survival": "生存",
-    "Open World": "开放世界",
-    "Singleplayer": "单人",
-    "Multiplayer": "多人",
-    "Co-op": "合作",
-    "Online Co-Op": "在线合作",
-    "Local Co-Op": "本地合作",
-    "FPS": "第一人称射击",
-    "Third Person": "第三人称",
-    "Shooter": "射击",
-    "Horror": "恐怖",
-    "Psychological Horror": "心理恐怖",
-    "Survival Horror": "生存恐怖",
+    "RPG": "RPG",
     "Racing": "竞速",
+    "Simulation": "模拟",
     "Sports": "体育",
-    "Fighting": "格斗",
+    "Strategy": "策略",
+
+    "Action RPG": "动作 RPG",
+    "Action-Adventure": "动作冒险",
     "Arcade": "街机",
-    "Card Game": "卡牌游戏",
-    "Deckbuilder": "卡组构筑",
-    "Roguelike": "Roguelike",
-    "Roguelite": "Roguelite",
-    "Metroidvania": "银河恶魔城",
-    "Hack and Slash": "砍杀",
-    "CRPG": "CRPG",
-    "JRPG": "JRPG",
-    "RTS": "即时战略",
-    "Turn-Based Strategy": "回合制策略",
-    "City Builder": "城市建造",
-    "Sandbox": "沙盒",
-    "Story Rich": "剧情丰富",
-    "Atmospheric": "氛围",
-    "Funny": "搞笑",
-    "Relaxing": "轻松",
-    "Cute": "可爱",
-    "Dark": "黑暗",
-    "Fantasy": "奇幻",
-    "Sci-fi": "科幻",
-    "Sci-Fi": "科幻",
-    "Mystery": "悬疑",
-    "Exploration": "探索",
+    "Base Building": "基地建造",
+    "Board Game": "桌游",
     "Building": "建造",
-    "Crafting": "制作",
-    "Resource Management": "资源管理",
-    "Management": "经营管理",
-    "Tactical": "战术",
+    "Card Game": "卡牌",
+    "Exploration": "探索",
+    "Hidden Object": "找物",
+    "Horror": "恐怖",
+    "Idler": "放置",
+    "Interactive Fiction": "互动小说",
+    "Management": "经营",
+    "Open World": "开放世界",
+    "Platformer": "平台跳跃",
+    "Point & Click": "点击冒险",
+    "Roguelike": "Roguelike",
+    "Sandbox": "沙盒",
+    "Shooter": "射击",
     "Stealth": "潜行",
-    "Psychological": "心理",
+    "Survival": "生存",
+    "Tower Defense": "塔防",
+    "Turn-Based Strategy": "回合制策略",
+    "Visual Novel": "视觉小说",
+    "Walking Simulator": "步行模拟",
+
+    # --------------------------------------------------------
+    # 子类型
+    # --------------------------------------------------------
+
+    "2D Platformer": "2D 平台跳跃",
+    "3D Platformer": "3D 平台跳跃",
+    "Action Roguelike": "动作 Roguelike",
+    "Bullet Hell": "弹幕射击",
+    "Choose Your Own Adventure": "互动冒险",
+    "Collectathon": "收集探索",
+    "Dating Sim": "恋爱模拟",
+    "Detective": "侦探",
+    "Dungeon Crawler": "迷宫探索",
+    "Education": "教育",
+    "FPS": "第一人称射击",
+    "Hack and Slash": "砍杀",
+    "Immersive Sim": "沉浸式模拟",
+    "Incremental": "增量游戏",
+    "JRPG": "JRPG",
+    "Life Sim": "生活模拟",
+    "Precision Platformer": "精准平台跳跃",
+    "Psychological Horror": "心理恐怖",
+    "Puzzle Platformer": "解谜平台跳跃",
+    "Roguelite": "Roguelite",
+    "Shoot 'Em Up": "纵版射击",
+    "Side Scroller": "横版",
+    "Survival Horror": "生存恐怖",
+    "Third-Person Shooter": "第三人称射击",
+    "Top-Down Shooter": "俯视角射击",
+    "Turn-Based Tactics": "回合制战术",
+
+    # --------------------------------------------------------
+    # 年代 / 氛围 / 世界观
+    # --------------------------------------------------------
+
+    "1980s": "1980 年代",
+    "1990's": "1990 年代",
+    "Atmospheric": "氛围",
+    "Dark": "黑暗",
+    "Dark Fantasy": "黑暗奇幻",
+    "Demons": "恶魔",
+    "Economy": "经济",
+    "Family Friendly": "适合家庭",
+    "Fantasy": "奇幻",
+    "Futuristic": "未来",
+    "Historical": "历史",
+    "Investigation": "调查",
+    "LGBTQ+": "LGBTQ+",
+    "Logic": "逻辑",
+    "Magic": "魔法",
+    "Medieval": "中世纪",
+    "Mystery": "悬疑",
+    "Nature": "自然",
+    "Old School": "复古",
+    "Post-apocalyptic": "末日",
+    "Retro": "复古",
+    "Romance": "恋爱",
+    "Sci-fi": "科幻",
+    "Space": "太空",
+    "Surreal": "超现实",
+    "Tactical": "战术",
+    "Thriller": "惊悚",
+    "War": "战争",
+    "Zombies": "僵尸",
+
+    # --------------------------------------------------------
+    # 游戏机制
+    # --------------------------------------------------------
+
+    "Character Customization": "角色自定义",
     "Choices Matter": "选择影响剧情",
+    "Combat": "战斗",
+    "Crafting": "制作",
+    "Dialogue Heavy": "大量对话",
+    "Female Protagonist": "女性主角",
+    "Linear": "线性",
     "Multiple Endings": "多结局",
+    "Physics": "物理",
+    "Procedural Generation": "程序生成",
+    "PvE": "PvE",
+    "PvP": "PvP",
+    "Resource Management": "资源管理",
+    "Score Attack": "分数挑战",
+    "Time Management": "时间管理",
+    "Turn-Based Combat": "回合制战斗",
+
+    # --------------------------------------------------------
+    # 视觉风格
+    # --------------------------------------------------------
+
+    "2.5D": "2.5D",
+    "2D": "2D",
+    "3D": "3D",
+    "Abstract": "抽象",
+    "Anime": "动漫",
+    "Cartoon": "卡通",
+    "Cartoony": "卡通风格",
+    "Cinematic": "电影化",
+    "Colorful": "多彩",
+    "Cute": "可爱",
+    "First-Person": "第一人称",
+    "Hand-drawn": "手绘",
+    "Isometric": "等距视角",
+    "Minimalist": "极简",
+    "Pixel Graphics": "像素画风",
+    "Realistic": "写实",
+    "Stylized": "风格化",
+    "Text-Based": "文字游戏",
+    "Third Person": "第三人称",
+    "Top-Down": "俯视角",
+
+    # --------------------------------------------------------
+    # 体验 / 内容
+    # --------------------------------------------------------
+
+    "Comedy": "喜剧",
+    "Dark Humor": "黑色幽默",
+    "Difficult": "高难度",
+    "Emotional": "情感丰富",
+    "Funny": "搞笑",
+    "Great Soundtrack": "优秀原声",
+    "Lore-Rich": "丰富世界观",
+    "Psychological": "心理",
+    "Relaxing": "轻松",
+    "Story Rich": "剧情丰富",
+
+    # --------------------------------------------------------
+    # 联机
+    # --------------------------------------------------------
+
+    "Co-op": "合作",
+    "Local Co-Op": "本地合作",
+    "Local Multiplayer": "本地多人",
+    "Multiplayer": "多人",
+    "Online Co-Op": "在线合作",
+    "Singleplayer": "单人",
+
+    # --------------------------------------------------------
+    # 其他
+    # --------------------------------------------------------
+
+    "Controller": "支持手柄",
+
+    "Gore": "血腥",
+    "Hentai": "Hentai",
+    "Nudity": "裸露",
+    "Sexual Content": "色情内容",
+    "Violent": "暴力",
+
+    "Early Access": "抢先体验",
+    "Free to Play": "免费游玩",
+    "Indie": "独立",
 }
 
 
 def translate_tag(tag):
-    """
-    Steam250 标签中文化。
-
-    优先使用精确映射；
-    没有映射时保留原文，避免错误翻译。
-    """
-
     tag = tag.strip()
 
-    if tag in TAG_TRANSLATIONS:
-        return TAG_TRANSLATIONS[tag]
+    return TAG_TRANSLATIONS.get(
+        tag,
+        tag
+    )
 
-    return tag
 
+# ============================================================
+# 排除标签
+# ============================================================
+
+EXCLUDED_TAGS = {
+    "Horror",
+    "Psychological Horror",
+    "Survival Horror",
+    "Sexual Content",
+    "Nudity",
+}
+
+
+# ============================================================
+# Utility
+# ============================================================
 
 def clean_text(text):
-    return " ".join(text.split())
+    return " ".join(
+        text.split()
+    )
 
 
 # ============================================================
@@ -116,28 +264,45 @@ def clean_text(text):
 # ============================================================
 
 def load_state():
+
     if not STATE_FILE.exists():
         return set()
 
     try:
+
         data = json.loads(
-            STATE_FILE.read_text(encoding="utf-8")
+            STATE_FILE.read_text(
+                encoding="utf-8"
+            )
         )
 
-        return set(data.get("pushed", []))
+        return set(
+            data.get(
+                "pushed",
+                []
+            )
+        )
 
-    except Exception:
+    except Exception as e:
+
+        print(
+            f"读取 state.json 失败：{e}"
+        )
+
         return set()
 
 
 def save_state(pushed_ids):
+
     STATE_FILE.parent.mkdir(
         parents=True,
         exist_ok=True
     )
 
     data = {
-        "pushed": list(pushed_ids)[-500:]
+        "pushed": list(
+            pushed_ids
+        )[-500:]
     }
 
     STATE_FILE.write_text(
@@ -151,30 +316,30 @@ def save_state(pushed_ids):
 
 
 # ============================================================
-# 找到 Steam250 主榜单
+# 找到主榜单
 # ============================================================
 
 def get_main_ranking(soup):
-    """
-    只定位 Week Top 50 Games Ranking 对应的主榜单。
-
-    不读取：
-    - 左侧 New entries
-    - Daily movement
-    - 页面其他区域
-    """
 
     heading = soup.find(
         lambda tag:
-        tag.name in {"h1", "h2", "h3"}
+        tag.name in {
+            "h1",
+            "h2",
+            "h3"
+        }
         and
         "Week Top 50 Games Ranking"
         in clean_text(
-            tag.get_text(" ", strip=True)
+            tag.get_text(
+                " ",
+                strip=True
+            )
         )
     )
 
     if not heading:
+
         raise RuntimeError(
             "找不到 Week Top 50 Games Ranking"
         )
@@ -183,10 +348,15 @@ def get_main_ranking(soup):
         lambda tag:
         tag.name == "section"
         and
-        "applist" in tag.get("class", [])
+        "applist"
+        in tag.get(
+            "class",
+            []
+        )
     )
 
     if not ranking:
+
         raise RuntimeError(
             "找到 Top 50 标题，但找不到对应的主榜单 section"
         )
@@ -195,22 +365,10 @@ def get_main_ranking(soup):
 
 
 # ============================================================
-# 解析好评率
+# 好评率
 # ============================================================
 
 def parse_rating(review_div):
-    """
-    从：
-
-    <div class="meter rating">
-        <span style="width: 100%"></span>
-        100%
-    </div>
-
-    获取：
-
-    100%
-    """
 
     meter = review_div.select_one(
         "div.meter.rating"
@@ -219,9 +377,12 @@ def parse_rating(review_div):
     if not meter:
         return "N/A"
 
-    rating_span = meter.find("span")
+    rating_span = meter.find(
+        "span"
+    )
 
     if rating_span:
+
         style = rating_span.get(
             "style",
             ""
@@ -236,7 +397,6 @@ def parse_rating(review_div):
         if match:
             return match.group(1)
 
-    # 备用方案
     text = clean_text(
         meter.get_text(
             " ",
@@ -256,32 +416,19 @@ def parse_rating(review_div):
 
 
 # ============================================================
-# 获取 Steam 图片
+# Steam250 图片
 # ============================================================
 
 def parse_image(row):
-    """
-    Steam250 中：
-
-    <img
-        alt="logo"
-        class="lazy entered loaded"
-        data-src="//shared.cloudflare.steamstatic.com/..."
-        src="//shared.cloudflare.steamstatic.com/..."
-    >
-
-    优先使用 data-src。
-    """
 
     img = row.find(
-        "img",
-        class_=lambda classes:
-        classes and "lazy" in classes
+        "img"
     )
 
     if not img:
         return None
 
+    # Steam250 当前实际图片
     image_url = (
         img.get("data-src")
         or
@@ -291,14 +438,57 @@ def parse_image(row):
     if not image_url:
         return None
 
-    # //shared.cloudflare...
     if image_url.startswith("//"):
-        image_url = "https:" + image_url
+
+        image_url = (
+            "https:"
+            + image_url
+        )
 
     elif image_url.startswith("/"):
-        image_url = "https://steam250.com" + image_url
+
+        image_url = (
+            "https://steam250.com"
+            + image_url
+        )
 
     return image_url
+
+
+# ============================================================
+# 从 Steam 商店 URL 获取 AppID
+# ============================================================
+
+def get_steam_appid(store_url):
+
+    match = re.search(
+        r"/app/(\d+)",
+        store_url
+    )
+
+    if match:
+        return match.group(1)
+
+    return None
+
+
+# ============================================================
+# Steam Header 图片备用方案
+# ============================================================
+
+def get_fallback_image(store_url):
+
+    appid = get_steam_appid(
+        store_url
+    )
+
+    if not appid:
+        return None
+
+    return (
+        "https://shared.cloudflare.steamstatic.com/"
+        f"store_item_assets/steam/apps/{appid}/header.jpg"
+    )
 
 
 # ============================================================
@@ -308,7 +498,7 @@ def parse_image(row):
 def parse_game(row):
 
     # --------------------------------------------------------
-    # 1. 只接受 New
+    # 1. 必须是 New
     # --------------------------------------------------------
 
     rank_div = row.find(
@@ -331,7 +521,7 @@ def parse_game(row):
         return None
 
     # --------------------------------------------------------
-    # 2. 游戏标题
+    # 2. 标题
     # --------------------------------------------------------
 
     title_div = row.find(
@@ -363,12 +553,6 @@ def parse_game(row):
 
     # --------------------------------------------------------
     # 3. Steam 商店链接
-    #
-    # 不使用：
-    # club.steam250.com/app/xxxx
-    #
-    # 使用：
-    # actions.stat > a.store
     # --------------------------------------------------------
 
     actions_div = row.find(
@@ -388,19 +572,15 @@ def parse_game(row):
     if not store_link:
         return None
 
-    store_url = store_link.get("href")
+    store_url = store_link.get(
+        "href"
+    )
 
     if not store_url:
         return None
 
     # --------------------------------------------------------
-    # 4. 排除 Free
-    #
-    # Steam250 Free 的实际 HTML：
-    #
-    # <div class="price stat">
-    #     <a class="free">Free</a>
-    # </div>
+    # 4. Free 排除
     # --------------------------------------------------------
 
     price_div = row.find(
@@ -418,13 +598,15 @@ def parse_game(row):
     )
 
     if free_marker:
+
         print(
             f"排除 Free：{name}"
         )
+
         return None
 
     # --------------------------------------------------------
-    # 5. 排除 Adult only
+    # 5. Adult only 排除
     # --------------------------------------------------------
 
     adult_marker = row.find(
@@ -434,13 +616,15 @@ def parse_game(row):
     )
 
     if adult_marker:
+
         print(
             f"排除 Adult only：{name}"
         )
+
         return None
 
     # --------------------------------------------------------
-    # 6. 获取 Steam250 标签
+    # 6. Steam250 标签
     # --------------------------------------------------------
 
     tags = [
@@ -450,26 +634,34 @@ def parse_game(row):
                 strip=True
             )
         )
-        for tag in title_div.select("a.tag")
+        for tag in title_div.select(
+            "a.tag"
+        )
     ]
 
     # --------------------------------------------------------
-    # 7. 排除 Horror
+    # 7. 排除指定标签
     # --------------------------------------------------------
 
-    if any(
-        "horror" in tag.lower()
+    excluded = [
+        tag
         for tag in tags
-    ):
+        if tag in EXCLUDED_TAGS
+    ]
+
+    if excluded:
+
         print(
-            f"排除 Horror：{name}"
+            f"排除指定标签：{name} "
+            f"({', '.join(excluded)})"
         )
+
         return None
 
     # --------------------------------------------------------
-    # 8. 标签翻译
+    # 8. 中文标签
     #
-    # 最多显示 3 个
+    # 最多显示三个
     # --------------------------------------------------------
 
     translated_tags = [
@@ -499,6 +691,7 @@ def parse_game(row):
         )
 
         if votes_span:
+
             votes = clean_text(
                 votes_span.get_text(
                     " ",
@@ -535,13 +728,27 @@ def parse_game(row):
         return None
 
     # --------------------------------------------------------
-    # 11. Steam Capsule 图片
+    # 11. 图片
+    #
+    # 第一优先：
+    # Steam250 当前页面的真实图片
+    #
+    # 第二优先：
+    # Steam header.jpg
     # --------------------------------------------------------
 
-    image_url = parse_image(row)
+    image_url = parse_image(
+        row
+    )
+
+    if not image_url:
+
+        image_url = get_fallback_image(
+            store_url
+        )
 
     # --------------------------------------------------------
-    # 返回
+    # 12. 返回
     # --------------------------------------------------------
 
     return {
@@ -557,10 +764,18 @@ def parse_game(row):
 
 
 # ============================================================
-# 获取 New 游戏
+# 获取主榜单 New
 # ============================================================
 
 def fetch_new_games():
+
+    print(
+        "========================================"
+    )
+
+    print(
+        "[1/5] Fetching Steam250..."
+    )
 
     response = requests.get(
         STEAM250_URL,
@@ -575,47 +790,61 @@ def fetch_new_games():
         "html.parser"
     )
 
+    print(
+        "[2/5] Locating main Top 50 ranking..."
+    )
+
     ranking = get_main_ranking(
         soup
     )
 
     games = []
 
-    # 只读取主榜单直接子元素
+    # 只读取主榜单的直接子元素
+    # 因此不会抓到左侧 New 小区域
     rows = ranking.find_all(
         "div",
         recursive=False
     )
 
+    print(
+        f"[3/5] Main ranking rows: {len(rows)}"
+    )
+
     for row in rows:
 
-        game = parse_game(row)
+        game = parse_game(
+            row
+        )
 
         if game:
-            games.append(game)
+
+            games.append(
+                game
+            )
+
+    print(
+        f"[4/5] Qualified New games: {len(games)}"
+    )
 
     return games
 
 
 # ============================================================
-# 创建 Discord Embed
+# Discord Embed
 # ============================================================
 
 def create_embed(game):
 
-    # ---------------------------------------------
-    # Description
-    # ---------------------------------------------
+    # --------------------------------------------------------
+    # 文字内容
+    # --------------------------------------------------------
 
     description = (
         f"{game['votes']} 评论数 · "
         f"{game['rating']} 好评率\n"
         f"💰 {game['price']}"
     )
-
-    # ---------------------------------------------
-    # 标签
-    # ---------------------------------------------
 
     if game["tags"]:
 
@@ -627,26 +856,27 @@ def create_embed(game):
             )
         )
 
-    # ---------------------------------------------
+    # --------------------------------------------------------
     # Embed
-    # ---------------------------------------------
+    # --------------------------------------------------------
 
     embed = {
         "title": f"🆕 {game['name']}",
         "url": game["url"],
         "description": description,
+
         "footer": {
             "text": "Steam250 · New Entry"
         }
     }
 
-    # ---------------------------------------------
-    # Steam Capsule
-    # ---------------------------------------------
+    # --------------------------------------------------------
+    # 大图
+    # --------------------------------------------------------
 
     if game.get("image"):
 
-        embed["thumbnail"] = {
+        embed["image"] = {
             "url": game["image"]
         }
 
@@ -663,12 +893,12 @@ def send_discord(games):
         return
 
     if not WEBHOOK_URL:
+
         raise RuntimeError(
             "未设置 STEAM250_DISCORD_WEBHOOK"
         )
 
-    # Discord webhook：
-    # 一次最多 10 个 embeds
+    # Discord Webhook 一条消息最多 10 个 Embed
     for start in range(
         0,
         len(games),
@@ -681,6 +911,7 @@ def send_discord(games):
 
         payload = {
             "username": "Steam250",
+
             "embeds": [
                 create_embed(game)
                 for game in batch
@@ -695,6 +926,11 @@ def send_discord(games):
 
         response.raise_for_status()
 
+        print(
+            f"Discord message sent: "
+            f"{len(batch)} embeds"
+        )
+
 
 # ============================================================
 # Main
@@ -702,36 +938,54 @@ def send_discord(games):
 
 def main():
 
-    games = fetch_new_games()
-
     print(
-        f"主榜单发现符合条件的 New：{len(games)}"
+        "Steam250 New Games"
     )
 
+    print(
+        "========================================"
+    )
+
+    games = fetch_new_games()
+
     if not games:
+
         print(
             "没有符合条件的 New 游戏。"
         )
+
         return
 
     pushed_ids = load_state()
 
     new_games = []
 
+    print(
+        "========================================"
+    )
+
+    print(
+        "[5/5] Checking pushed state..."
+    )
+
     for game in games:
 
         if game["id"] in pushed_ids:
 
             print(
-                f"跳过已推送：{game['name']}"
+                f"跳过已推送："
+                f"{game['name']}"
             )
 
             continue
 
-        new_games.append(game)
+        new_games.append(
+            game
+        )
 
     print(
-        f"本次待推送：{len(new_games)}"
+        f"本次待推送："
+        f"{len(new_games)}"
     )
 
     if not new_games:
@@ -743,8 +997,12 @@ def main():
         return
 
     # --------------------------------------------------------
-    # 推送前日志
+    # 输出日志
     # --------------------------------------------------------
+
+    print(
+        "========================================"
+    )
 
     for game in new_games:
 
@@ -752,9 +1010,23 @@ def main():
             f"推送：{game['name']} | "
             f"{game['votes']} 评论数 | "
             f"{game['rating']} 好评率 | "
-            f"{game['price']} | "
-            f"{game['url']}"
+            f"{game['price']}"
         )
+
+        print(
+            f"  Steam: {game['url']}"
+        )
+
+        print(
+            f"  Image: {game['image']}"
+        )
+
+        if game["tags"]:
+
+            print(
+                f"  Tags: "
+                f"{' · '.join(game['tags'])}"
+            )
 
     # --------------------------------------------------------
     # Discord
@@ -765,7 +1037,7 @@ def main():
     )
 
     # --------------------------------------------------------
-    # 更新状态
+    # 更新 state
     # --------------------------------------------------------
 
     for game in new_games:
@@ -779,7 +1051,15 @@ def main():
     )
 
     print(
+        "========================================"
+    )
+
+    print(
         "Discord 推送完成。"
+    )
+
+    print(
+        "State saved."
     )
 
 
