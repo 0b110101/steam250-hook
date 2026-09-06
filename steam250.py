@@ -70,6 +70,10 @@ TAG_TRANSLATIONS = {
     "Tower Defense": "塔防",
     "Turn-Based Strategy": "回合制策略",
     "Visual Novel": "视觉小说",
+    "Grand Strategy":'大战略',
+    "Roguelike Deckbuilder":"Roguelike 卡牌构筑",
+    "":"",
+    "Colony Sim":"殖民模拟",
     "Walking Simulator": "步行模拟",
 
     # --------------------------------------------------------
@@ -242,8 +246,7 @@ def translate_tag(tag):
 
 EXCLUDED_TAGS = {
     "Horror",
-    "Psychological Horror",
-    "Survival Horror",
+    "Hentai",
     "Sexual Content",
     "Nudity",
 }
