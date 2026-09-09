@@ -2,7 +2,6 @@ name: Steam250 New Games
 
 on:
   schedule:
-    # 北京时间每天 14:05
     - cron: "5 6 * * *"
 
   workflow_dispatch:
@@ -15,6 +14,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Check Time
+        run: |
+          echo "UTC time:"
+          date -u
+          echo ""
+          echo "Beijing time:"
+          TZ=Asia/Shanghai date
+          echo ""
+          echo "Event:"
+          echo "${{ github.event_name }}"
+
       - name: Checkout
         uses: actions/checkout@v4
 
