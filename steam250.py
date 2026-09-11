@@ -82,7 +82,9 @@ TAG_TRANSLATIONS = {
 
     "2D Platformer": "2D 平台跳跃",
     "3D Platformer": "3D 平台跳跃",
+    "Tactical RPG": "战术角色扮演", 
     "Action Roguelike": "动作 Roguelike",
+    "Card Battler": "卡牌对战",
     "Bullet Hell": "弹幕射击",
     "Choose Your Own Adventure": "互动冒险",
     "Collectathon": "收集探索",
