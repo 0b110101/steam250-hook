@@ -2,7 +2,7 @@ name: Steam250 New Games
 
 on:
   schedule:
-    - cron: "5 6 * * *"
+    - cron: "52 6 * * *"
   workflow_dispatch:
 
 permissions:
