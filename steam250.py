@@ -108,6 +108,9 @@ TAG_TRANSLATIONS = {
     "Third-Person Shooter": "第三人称射击",
     "Top-Down Shooter": "俯视角射击",
     "Turn-Based Tactics": "回合制战术",
+    "Sokoban": "推箱子",
+    "Open World Survival Craft": "开放世界生存制作",
+    "Rhythm": "音乐",
 
     # --------------------------------------------------------
     # 年代 / 氛围 / 世界观
@@ -142,6 +145,7 @@ TAG_TRANSLATIONS = {
     "Thriller": "惊悚",
     "War": "战争",
     "Zombies": "僵尸",
+    "Wargame": "战争模拟",
 
     # --------------------------------------------------------
     # 游戏机制
@@ -158,7 +162,7 @@ TAG_TRANSLATIONS = {
     "Physics": "物理",
     "Procedural Generation": "程序生成",
     "PvE": "PvE",
-    "PvP": "PvP",
+    "Combat Racing": "战斗竞速",
     "Resource Management": "资源管理",
     "Score Attack": "分数挑战",
     "Time Management": "时间管理",
