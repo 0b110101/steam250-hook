@@ -496,10 +496,20 @@ def load_state():
         return set()
     try:
         data = json.loads(STATE_FILE.read_text(encoding="utf-8"))
-        return set(data.get("pushed", []))
+        # 兼容旧格式（完整 URL，含尾部换行）：统一规范化为 appid
+        return {normalize_id(raw) for raw in data.get("pushed", [])}
     except Exception as e:
         print(f"读取 state.json 失败：{e}")
         return set()
+
+
+def normalize_id(raw):
+    """把历史推送 ID（任意格式）统一为 appid。"""
+    if not isinstance(raw, str):
+        return raw
+    stripped = raw.strip()
+    appid = get_steam_appid(stripped)
+    return appid if appid else stripped
 
 
 def save_state(pushed_ids):
@@ -563,10 +573,15 @@ def get_fallback_image(store_url):
 
 
 def get_main_ranking(soup):
+    # 兼容新旧文案："Week Top 50 Games Ranking" / "Top 50 Games of the Past Week"
     heading = soup.find(
         lambda tag: tag.name in {"h1", "h2", "h3"}
-        and "Week Top 50 Games Ranking"
-        in clean_text(tag.get_text(" ", strip=True))
+        and (
+            "Week Top 50 Games Ranking"
+            in clean_text(tag.get_text(" ", strip=True))
+            or "Top 50 Games of the Past Week"
+            in clean_text(tag.get_text(" ", strip=True))
+        )
     )
     if not heading:
         raise RuntimeError("找不到 Week Top 50 Games Ranking")
@@ -727,8 +742,12 @@ def parse_game(row):
     display_price = get_display_price(store_url, usd_price)
     time.sleep(1)  # 短暂延迟，避免频繁请求 Steam API 被限流
 
+    # 13. 去重键：appid（而非完整 URL，避免查询参数/换行导致去重失效）
+    appid = get_steam_appid(store_url)
+    game_id = appid if appid else store_url
+
     return {
-        "id": store_url,
+        "id": game_id,
         "name": name,
         "url": store_url,
         "votes": votes,
